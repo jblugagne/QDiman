@@ -30,10 +30,10 @@ function strct = changesettings(strct)
     width=mmc.getImageWidth();
     height=mmc.getImageHeight();
     
-    if ~strfind(guihs.timeLapseSetUp.Channels.Data{cc,1},'trans')
+    if isempty(strfind(guihs.timeLapseSetUp.Channels.Data{cc,1},'trans'))
         return;
     end
-
+    
     % You CANNOT name a field 'name' or 'value'
     visp('Opening settings dialog...',2, strct);
     strct.settings.name{1} = 'verbosity';
@@ -70,9 +70,7 @@ function strct = changesettings(strct)
     
     % Starting 
     visp('Launching figure...',3, strct);
-    handlemanip = figure();
-    imshow(imadjust(UD.orig));
-    [strct.ROIS_P,strct.BKGD_P,strct.CrossROI_P,strct.CrossRef] = ROIselection();
+    [strct.ROIS_P,strct.BKGD_P,strct.CrossROI_P,strct.CrossRef] = ROIselection(UD.orig);
     
 
     % Check whether we are initializing, and choose the filepath accordingly
@@ -87,39 +85,40 @@ function strct = changesettings(strct)
     visp('Saving settings structure in acquisition directory...',2, strct);
     save(fullfile(strct.filespath,'strctsettings.mat'),'strct');
 
-    if ~isfield(guihs,'imagingserver')
+    if ~isfield(guihs,'imagingserver') || isempty(guihs.imagingserver)
         guihs.imagingserver = tcpip('localhost',30001,'NetworkRole','client');
         visp('Connecting to imaging server...',1, strct);
         fopen(guihs.imagingserver);
         visp('Connected...',1, strct);
     end
-    
+    pause(1)
     visp('Sending setup message to server...',2, strct);
-    fprintf(guihs.imagingserver,    [ ...
+    fprintf(guihs.imagingserver,    sprintf([ ...
                                     '<CMD>\n' ...
                                     'SETUP\n' ...
                                     guihs.timeLapseSetUp.positionNames{pp} '\n' ...
                                     guihs.timeLapseSetUp.Channels.Data{cc,1}  '\n' ...
-                                    fullfile(strct.filespath,'strctsettings.mat') '\n' ...
+                                    regexprep(fullfile(strct.filespath,'strctsettings.mat'),'\\','\\\\') '\n' ...
                                     '</CMD>\n' ...
-                                    ]);
+                                    ]));
     
     visp('Closing settings...',2, strct);
-    
-    
-fprintf(t,    [ ...
-                                '<CMD>\n' ...
-                                'ACQ\n' ...
-                                'chan01' '\n' ...
-                                'trans'  '\n' ...
-                                'thisisatest '\n' ...
-                                '</CMD>\n' ...
-                                ]);
+
 
 function strct = runQDimanSegment(strct)
 
     global guihs mmc
     visp('Sending signal to server...',1, strct);
+    
+    cc = guihs.timeLapseSetUp.CurrentChannel; 
+    pp = guihs.timeLapseSetUp.CurrentPosition;
+    
+    % Dirty:
+    if cc == 1
+        dispL = [num2str(round([guihs.timeLapseSetUp.driftcorr(cc,pp).settings.pxerr(end) guihs.timeLapseSetUp.driftcorr(cc,pp).settings.pyerr(end)])) '\n' ];
+    else
+        dispL = '';
+    end
 
     fprintf(guihs.imagingserver,    [ ...
                                 '<CMD>\n' ...
@@ -127,6 +126,7 @@ function strct = runQDimanSegment(strct)
                                 guihs.timeLapseSetUp.positionNames{pp} '\n' ...
                                 guihs.timeLapseSetUp.Channels.Data{cc,1}  '\n' ...
                                 guihs.timeLapseSetUp.lastIMGfile '\n' ...
+                                dispL ...
                                 '</CMD>\n' ...
                                 ]);
 
@@ -147,9 +147,14 @@ function visp(msg,verbosity,strct)
         fprintf(msg);
     end
     
-function [ROIS_P,BKGD_P,CrossROI_P,CrossRef] = ROIselection()
+function [ROIS_P,BKGD_P,CrossROI_P,CrossRef] = ROIselection(orI)
 %% Ask user to place the ROIs
 
+
+    handlemanip = figure();
+    imshow(imadjust(orI));
+    handlegra = gca;
+    
     % Ask for ROIS
     numROI = 0;
     while true
@@ -157,7 +162,7 @@ function [ROIS_P,BKGD_P,CrossROI_P,CrossRef] = ROIselection()
         switch lower(ret)
             case 'y'
                 numROI = numROI + 1;
-                ROIS(numROI) = imrect(gca, [10 10 30 20]);
+                ROIS(numROI) = imrect(handlegra, [10 10 30 20]);
                 setResizable(ROIS(numROI),false);
             case 'n'
                 break;
@@ -173,8 +178,8 @@ function [ROIS_P,BKGD_P,CrossROI_P,CrossRef] = ROIselection()
     ret = input('Add background? [Y/n]: ','s');
     switch lower(ret)
         case 'y'
-            BKGD = imrect(gca, [10 10 30 20]);
-            wait(BKGD)
+            BKGD = imrect(handlegra, [10 10 30 20]);
+            wait(BKGD);
             BKGD_P  = BKGD.getPosition;
         case 'n'
             % Nothing to do
@@ -183,8 +188,10 @@ function [ROIS_P,BKGD_P,CrossROI_P,CrossRef] = ROIselection()
     
     % Ask user for cross to compute cross-correlation
     disp('Please place the square on the cross for xcorr')
-    CrossROI = imrect(gca, [10 10 150 150]);
-    setResizable(CrossROI,false);
+    CrossROI = imrect(handlegra, [10 10 150 150]);
+    setResizable(CrossROI,true);
     wait(CrossROI);
     CrossROI_P = CrossROI.getPosition;
-    CrossRef = imcrop(orI,CrossROI_P);
+    CrossRef = imcrop(imadjust(orI),CrossROI_P);
+
+    close(handlemanip)

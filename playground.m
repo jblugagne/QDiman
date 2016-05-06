@@ -235,3 +235,20 @@ xlabel 'periode (h)'
 ylabel 'Phase (rad)'
 
 
+%% Reconstruct control level
+ImagingServer.positions(3).name
+levels = ImagingServer.positions(3).levels.gfp.levelMean;
+tpoints = ImagingServer.positions(3).levels.gfp.timepoints;
+controller = ch3GFPcntrlwrpr;
+
+for ind1 = 1:numel(tpoints)
+    controller.decisions(ind1) = controller.controller.decide(levels(1:ind1,controller.celltocontrol),tpoints(1:ind1)');
+end
+
+%% Misc
+
+h1 = line([xlim],[1e3 1e3],'Color','g')
+h2 = line([2e3 2e3],[ylim],'Color','r')
+
+xlabel('laci-mkate2')
+ylabel('tetr-megfp')

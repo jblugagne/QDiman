@@ -210,6 +210,7 @@ classdef QDimanServer < handle & hgsetget
                     case 2 % ratio
                         for ind3 = 1:numel(curves)
                             semilogy(obj.positions(ind1).levels.(fields{1}).timepoints./3600,smooth(obj.positions(ind1).levels.(fields{1}).levelMean(:,curves(ind3)),20)./smooth(obj.positions(ind1).levels.(fields{2}).levelMean(:,curves(ind3)),20))
+                            set(gca,'YScale','log')
                             hold on
                         end
                     case 3 % traj

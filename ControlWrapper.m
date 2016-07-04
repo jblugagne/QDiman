@@ -10,6 +10,7 @@ classdef ControlWrapper < handle
         media = 'pcm1'; % Media percentage to modify depending on the decision result. (1 =iptg, 2=aTC)
         sensorlistener;
         decisions = [];
+        decisiontimes = [];
         decisionslistener;
         celltocontrol = 1;
         positionnb = 1;
@@ -58,6 +59,7 @@ classdef ControlWrapper < handle
                 levels = evt.AffectedObject.positions(obj.positionnb).levels.(obj.channel).levelMean;
                 tpoints = evt.AffectedObject.positions(obj.positionnb).levels.(obj.channel).timepoints;
                 obj.decisions(end+1) = obj.controller.decide(levels(:,obj.celltocontrol),tpoints);
+                obj.decisiontimes(end+1) = now;
             end
         end
         

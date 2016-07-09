@@ -1,0 +1,5 @@
+# Ignore PNGs (used for making frames)
+**/*.png
+
+# Ignore TIFs (used for making frames)
+**/*.tif

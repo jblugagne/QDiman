@@ -40,19 +40,30 @@ classdef QDimanServer < handle & hgsetget
             else
                 obj.positions(end+1) = struct('name',pos,'segchan',chan,'settings',scriptsettings.strct,'displacement',[0 0],'levels',struct());
             end
-            obj.visp(['Set up new position: ' pos ', reference channel: ' chan])
+            obj.visp(['Set up new position: ' pos ', referenceï¿½channel: ' chan])
         end
         
         function calculatedisplacement(obj,Icorr,ind1)
             obj.visp(['Computing displacement for position ' obj.positions(ind1).name ])
             sts = obj.positions(ind1).settings;
             % Compute cross corr
-            crossComp = imcrop(imadjust(Icorr),sts.CrossROI_P);
-            motionXC = normxcorr2(sts.CrossRef,crossComp);
+            Ic = imcrop(imadjust(Icorr),sts.CrossROI_P);
+            motionXC = normxcorr2(sts.CrossRef,Ic);
             % Find peak and get displacement:
             [rowM, colM] = find(motionXC == max(motionXC(:)));
-            obj.positions(ind1).displacement(end+1,:) = [(rowM - sts.CrossROI_P(3) - 1) (colM - sts.CrossROI_P(4) - 1) ];
+            displ = fliplr([(rowM - sts.CrossROI_P(3) - 1) (colM - sts.CrossROI_P(4) - 1) ]);
+            obj.positions(ind1).displacement(end+1,:) = displ;
             obj.visp(['displacement = ' num2str(obj.positions(ind1).displacement(end,:)) ],2);
+            % Display that shit:
+            fh = findobj(0, 'tag', 'my window');
+            if isempty(fh)
+                fh = figure;
+                set(fh, 'name', 'Last displacement');
+                set(fh, 'tag', 'my window');
+            end
+            set(0,'CurrentFigure',fh);
+            C = imfuse(imtranslate(Ic,-displ,sts.CrossRef),'falsecolor','Scaling','joint','ColorChannels','red-cyan');
+            imshow(C)
         end
         
         function extractfluo(obj,I,ind1,chan,dirStruct)
@@ -63,15 +74,16 @@ classdef QDimanServer < handle & hgsetget
             obj.latestchannel = chan;
             obj.visp(['Extracting fluo for position: ' obj.latestposition  ', on channel: ' chan])
             
+            I = imtranslate(Ic,-displ);
             % If we have a background:
             if ~isempty(sts.BKGD_P)
-                fluo = imcrop(I, sts.BKGD_P + [fliplr(displ) 0 0 ]);
+                fluo = imcrop(I, sts.BKGD_P);
                 bkgd = mean(fluo(:));
             else
                 bkgd = 0;
             end
             
-            % If we already have levels acquired in this channel, we append data. Otherwise ind1 = 1:
+            % If we already have levels acquired in this channel, we append data. Otherwise ind0 = 1:
             if ~isfield(obj.positions(ind1).levels,chan) || ~isfield(obj.positions(ind1).levels.(chan),'levelMean')
                 ind0 = 1;
             else
@@ -88,7 +100,7 @@ classdef QDimanServer < handle & hgsetget
             
             % Then acquire fluo for each position and store it in the levels field: 
             for ind2 = 1:numel(sts.ROIS_P)
-                fluo = imcrop(I, sts.ROIS_P{ind2} + [fliplr(displ) 0 0 ]); % set the position to take into account the displacement
+                fluo = imcrop(I, sts.ROIS_P{ind2}); % set the position to take into account the displacement
                 if ~isempty(fluo)
                     obj.positions(ind1).levels.(chan).levelMean(ind0,ind2) = mean(fluo(:))-bkgd;
                     obj.positions(ind1).levels.(chan).levelMedian(ind0,ind2) = median(fluo(:))-bkgd;
@@ -132,11 +144,10 @@ classdef QDimanServer < handle & hgsetget
             % According to channel, calculate displacement or extract fluo:
             switch chan
                 case obj.positions(ind1).segchan
-%                     obj.calculatedisplacement(I,ind1);
-                    dispL = fgetl(obj.server);
-                    obj.positions(ind1).displacement(end+1,:) = str2num(dispL);
+                    obj.calculatedisplacement(I,ind1);
+                    dummy = fgetl(obj.server);
+%                     obj.positions(ind1).displacement(end+1,:) = str2num(dispL);
                     obj.visp(['displacement = ' num2str(obj.positions(ind1).displacement(end,:)) ],2);
-                    
                 otherwise
                     obj.extractfluo(I,ind1,chan,dirStruct);
             end
@@ -166,8 +177,6 @@ classdef QDimanServer < handle & hgsetget
                         plottype = 3;
                 end
             end
-            
-            
             
             
             handles = [];

@@ -33,6 +33,7 @@ classdef PIcontrollerNew < handle
         function decision = decide(obj,values,tpoints)
             c = obj.capdecision;
             err = values - obj.reconstructobjective(tpoints)';
+
             
             try % The delay version
                 [~,start_int] = find(tpoints>obj.idelay*60, 1, 'first');

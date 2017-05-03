@@ -58,6 +58,7 @@ classdef ControlWrapper < handle
                 evt.AffectedObject.newvalue = 0;
                 levels = evt.AffectedObject.positions(obj.positionnb).levels.(obj.channel).levelMean(:,obj.celltocontrol);
                 tpoints = evt.AffectedObject.positions(obj.positionnb).levels.(obj.channel).timepoints;
+                
                 if numel(tpoints) <= 21
                 levels = smooth(levels,20);
                 else
@@ -66,6 +67,7 @@ classdef ControlWrapper < handle
                 levels(end) = evt.AffectedObject.positions(obj.positionnb).levels.(obj.channel).levelMean(end,obj.celltocontrol);
                 
                 obj.decisions(end+1) = obj.controller.decide(levels,tpoints);
+
                 obj.decisiontimes(end+1) = now;
             end
         end
